@@ -9,3 +9,6 @@ description = "hqq quantization with svd"
 dependencies = [
     "torch",
 ]
+
+[tool.setuptools]
+packages = ["hqqsvd"]
