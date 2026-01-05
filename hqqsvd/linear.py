@@ -6,7 +6,7 @@ from .quantize import quantize, dequantize
 
 class HQQSVDLinear(torch.nn.Module):
     def __init__(
-        self, W_q, svd_up, svd_down, scale, zero_point, bias, nbits
+        self, W_q, svd_up, svd_down, scale, zero_point, bias, nbits, int8_matmul:bool=True
     ):
         super().__init__()
         self.in_features = svd_down.shape[1]
@@ -24,7 +24,7 @@ class HQQSVDLinear(torch.nn.Module):
         self.bias = torch.nn.Parameter(bias, False)
         self.nbits = torch.nn.Parameter(torch.tensor([nbits]), False) # for serialization
         self._nbits = nbits
-        self.matmul_dtype = "int8"
+        self.int8_matmul = int8_matmul
 
     @classmethod
     def from_linear(
@@ -69,6 +69,6 @@ class HQQSVDLinear(torch.nn.Module):
 
     @torch.compile(fullgraph=True)
     def forward(self, x:torch.FloatTensor):
-        if self.matmul_dtype == "int8" and x.numel() / x.shape[-1] >= 16:
+        if self.int8_matmul and x.numel() / x.shape[-1] >= 16:
             return self.forward_int8(x)
         return torch.nn.functional.linear(x, self.dequantize(), self.bias)
