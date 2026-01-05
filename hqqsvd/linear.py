@@ -9,9 +9,9 @@ class Lora(torch.nn.Module):
         self.name = name
         self.lora_up = lora_up
         self.lora_down = lora_down
-        self.alpha = alpha
+        self.alpha = alpha if alpha is not None else 1.0
         self.rank = lora_up.shape[1]
-        self.scale = torch.tensor([strength * alpha / self.rank], device="cuda", dtype=lora_up.dtype)
+        self.scale = torch.tensor([strength * self.alpha / self.rank], device="cuda", dtype=lora_up.dtype)
         self.strength = strength
 
     def get_weight(self):
