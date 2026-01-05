@@ -3,6 +3,19 @@ torch._dynamo.config.cache_size_limit = max(8192, getattr(torch._dynamo.config, 
 torch._dynamo.config.accumulated_recompile_limit = max(8192, getattr(torch._dynamo.config, "accumulated_recompile_limit", 0))
 from .quantize import quantize, dequantize
 
+class Lora(torch.nn.Module):
+    def __init__(self, name, lora_up, lora_down, alpha, strength=1.0):
+        super().__init__()
+        self.name = name
+        self.lora_up = lora_up
+        self.lora_down = lora_down
+        self.alpha = alpha
+        self.rank = lora_up.shape[1]
+        self.scale = torch.tensor([strength * alpha / self.rank], device="cuda", dtype=lora_up.dtype)
+        self.strength = strength
+
+    def get_weight(self):
+        return self.scale * self.lora_up @ self.lora_down
 
 class HQQSVDLinear(torch.nn.Module):
     def __init__(
@@ -25,6 +38,7 @@ class HQQSVDLinear(torch.nn.Module):
         self.nbits = torch.nn.Parameter(torch.tensor([nbits]), False) # for serialization
         self._nbits = nbits
         self.int8_matmul = int8_matmul
+        self.loras = {}
 
     @classmethod
     def from_linear(
@@ -41,9 +55,15 @@ class HQQSVDLinear(torch.nn.Module):
         return cls(
             W_q, svd_up, svd_down, scale, zero_point, linear.bias, nbits
         )
-
+    
+    def add_lora(self, lora):
+        self.loras[lora.name] = lora
+    
+    def remove_lora(self, name):
+        self.loras.pop(name)
+    
     def dequantize(self):
-        return dequantize(
+        W_f = dequantize(
             self.weight,
             self.svd_up,
             self.svd_down,
@@ -53,6 +73,9 @@ class HQQSVDLinear(torch.nn.Module):
             self.o_shape,
             self._nbits
         )
+        for lora in self.loras.values():
+            W_f += lora.get_weight()
+        return W_f
     
     def forward_int8(self, x:torch.FloatTensor):
         x = x.view((-1, x.shape[-1]))
