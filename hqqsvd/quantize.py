@@ -19,7 +19,7 @@ def apply_svdquant(weight: torch.FloatTensor, rank: int = 32, niter: int = 8) ->
     return weight, svd_up, svd_down
 
 
-def quantize(W, svd_rank:int=128, svd_steps:int=8, group_size:int=128, nbits:int=4):
+def quantize(W, svd_rank:int=128, svd_steps:int=8, group_size:int=128, nbits:int=4, fast=True):
     dtype = W.dtype
     shape = W.shape
 
@@ -40,7 +40,10 @@ def quantize(W, svd_rank:int=128, svd_steps:int=8, group_size:int=128, nbits:int
     scale = scale.clamp(max=2e4) # clamp to avoid half-precision problems
     zero = -_min * scale
 
-    W_q, scale, zero = optimize_weights(W, scale, zero, min_max, 1)
+    if fast:
+        W_q = (W * scale + zero).round_().clamp_(min_max[0], min_max[1])
+    else:
+        W_q, scale, zero = optimize_weights(W, scale, zero, min_max, 1)
 
     W_q = W_q.reshape((shape[0], -1, group_size))
     W_q = torch.clamp(W_q, min_v, max_v).to(torch.uint8)

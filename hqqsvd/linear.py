@@ -105,11 +105,29 @@ class HQQSVDLinear(torch.nn.Module):
         svd_steps: int = 8,
         group_size: int = 128,
         nbits: int = 4,
+        fast:bool=True
     ):
-        W_q, svd_up, svd_down, scale, zero_point = quantize(
-            linear.weight, svd_rank, svd_steps, group_size, nbits
+        return cls.from_weights(linear.weight, svd_rank, svd_steps, group_size, nbits, fast, linear.bias)
+
+    @classmethod
+    def from_weights(
+        cls,
+        weight,
+        svd_rank: int = 128,
+        svd_steps: int = 8,
+        group_size: int = 128,
+        nbits: int = 4,
+        fast:bool=True,
+        bias=None
+    ):
+        if bias is None:
+            # currently no bias is not supported, so we use bias = 0 instead
+            bias = torch.zeros(
+                (weight.shape[0],), dtype=weight.dtype, device=weight.device
+            )
+        return cls(
+            *quantize(weight, svd_rank, svd_steps, group_size, nbits, fast), bias, nbits
         )
-        return cls(W_q, svd_up, svd_down, scale, zero_point, linear.bias, nbits)
 
     def add_lora(self, lora):
         self.loras[lora.name] = lora
@@ -168,7 +186,7 @@ class HQQSVDLinear(torch.nn.Module):
         return output + self.bias
 
     def _forward(self, x: torch.FloatTensor):
-        if self.int8_matmul and x.numel() / x.shape[-1] >= 16:
+        if self.int8_matmul and x.numel() / x.shape[-1] > 16:
             if TORCH_INT_MM:
                 return self.forward_int8(x)
             if TRITON_INT_MM:
