@@ -139,9 +139,9 @@ class HQQSVDLinear(torch.nn.Module):
     def from_linear(
         cls,
         linear: torch.nn.Linear,
-        svd_rank: int = 128,
+        svd_rank: int = 32,
         svd_steps: int = 8,
-        group_size: int = 128,
+        group_size: int = 32,
         nbits: int = 4,
         fast: bool = True,
         int8_matmul: bool = True,
@@ -165,9 +165,9 @@ class HQQSVDLinear(torch.nn.Module):
     def from_weights(
         cls,
         weight,
-        svd_rank: int = 128,
+        svd_rank: int = 32,
         svd_steps: int = 8,
-        group_size: int = 128,
+        group_size: int = 32,
         nbits: int = 4,
         fast: bool = True,
         bias=None,
